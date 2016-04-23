@@ -1,13 +1,13 @@
 #!/env/python
 
 import json
-import request
+import requests
 
 import configuration
 
 
-headers = {'Authorization':'token %s' % configuration.git_token}
-url = "https://api.github.com/%s/repos" % configuration.git_name
+HEADERS = {'Authorization':'token %s' % configuration.git_token}
+URL = "https://api.github.com/%s/repos" % configuration.git_name
 
 def create_repo(repo_name):
     """
@@ -16,9 +16,9 @@ def create_repo(repo_name):
 
     @param repo_name: desired name of repository
 
-    """ 
+    """
     post_data = json.dumps({'name':repo_name, 'private':False})
-    r = requests.post(url, post_data, headers=headers)
-    r.raise_for_status()
+    req = requests.post(URL, post_data, headers=HEADERS)
+    req.raise_for_status()
 
 
