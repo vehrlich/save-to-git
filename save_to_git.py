@@ -1,13 +1,12 @@
 #!/env/python
 
-import sys
 import json
 import requests
 import base64
 import argparse
 
 
-class GitSaver():
+class GitSaver(object):
 
     api_url = "https://api.github.com"
 
@@ -21,8 +20,8 @@ class GitSaver():
 
     def repo_exists(self):
         """
-        Check if repo exists. 
-        
+        Check if repo exists.
+
         @param repo_name: name of seeking repo
         @return True if repo exits. Otherwise False
         """
@@ -52,21 +51,17 @@ class GitSaver():
         """
         Return file info from git. Return None if file does not exist.
 
-        @param repo_name: desired name of repository
-        @param repo_file_path: path for file in repo
-        @param content: base64 encoded content of file
-
         @return sha of file or None if doesn't exists
         """
         # GET /repos/:owner/:repo/contents/:path
-        url = "/".join([self.api_url, 
-            'repos', 
-            self.git_name, 
-            self.repo_name, 
-            'contents', 
-            self.repo_file_path])
+        url = "/".join([self.api_url,
+                        'repos',
+                        self.git_name,
+                        self.repo_name,
+                        'contents',
+                        self.repo_file_path])
         post_data = json.dumps({'path': self.repo_file_path})
-        req = requests.put(url, post_data, headers=self.headers)
+        req = requests.get(url, post_data, headers=self.headers)
         if req.status_code == 200:
             return json.loads(req.content)['sha']
         else:
@@ -77,91 +72,115 @@ class GitSaver():
         """
         Creates file on repo_file_path in repo_name.
 
-        @param repo_name: desired name of repository
-        @param repo_file_path: path for file in repo
-        @param content: base64 encoded content of file
+        @return sha of file commit
         """
         # POST /repos/:owner/:repo/contents/:path
-        url = "/".join([self.api_url, 
-            'repos', 
-            self.git_name, 
-            self.repo_name, 
-            'contents', 
-            self.repo_file_path])
-        post_data = json.dumps({
-            'path': self.repo_file_path,
-            'message': 'created with faith',
-            'content': self.content})
+        url = "/".join([self.api_url,
+                        'repos',
+                        self.git_name,
+                        self.repo_name,
+                        'contents',
+                        self.repo_file_path])
+        post_data = json.dumps({'path': self.repo_file_path,
+                                'message': 'created with faith',
+                                'content': self.content})
         req = requests.put(url, post_data, headers=self.headers)
         req.raise_for_status()
+        return json.loads(req.content)['commit']['sha']
 
-
-    def update_file(self):
+    def update_file(self, sha):
         """
         Creates file on repo_file_path in repo_name.
 
-        @param repo_name: desired name of repository
-        @param repo_file_path: path for file in repo
-        @param content: base64 encoded content of file
+        @return sha of file commit
         """
         # POST /repos/:owner/:repo/contents/:path
-        url = "/".join([self.api_url, 
-            'repos', 
-            self.git_name, 
-            self.repo_name, 
-            'contents', 
-            self.repo_file_path])
-        post_data = json.dumps({
-            'path': self.repo_file_path,
-            'message': 'created with faith',
-            'content': content})
+        url = "/".join([self.api_url,
+                        'repos',
+                        self.git_name,
+                        self.repo_name,
+                        'contents',
+                        self.repo_file_path])
+        post_data = json.dumps({'path': self.repo_file_path,
+                                'message': 'updated with honor',
+                                'content': self.content,
+                                'sha':sha})
         req = requests.put(url, post_data, headers=self.headers)
         req.raise_for_status()
-
-
+        return json.loads(req.content)['commit']['sha']
 
 
 def main():
- 
-    parser = argparse.ArgumentParser(prog='save_to_git.py', 
-            description="Saves file into GIT. If repository doesn't exist, "\
-                    "creates it",
-            usage='./save_to_git.py <owner> <api_token> <local file path> '\
-            '<reponame>/<file path>')
-    parser.add_argument('owner', 
-            help='owner of repo')
-    parser.add_argument('api_token', 
-            help='authorized API token')
-    parser.add_argument('local_file_path', 
-            help='file to commit')
-    parser.add_argument('repo_file_path', 
-            help='reponame and path where to commit')
-    
+    """
+    Parse input arguments, prepares them for Class.
+    Checks if repo exists, creates one if not.
+    Checks if file exists. Create new one if not, updatea otherwise.
+
+    Returns commit hash
+    """
+
+    parser = argparse.ArgumentParser(prog='save_to_git.py',
+                                     description="Saves file into GIT. If "\
+                                                 "repository doesn't exist, "\
+                                                 "creates it",
+                                     usage="./save_to_git.py <owner> "\
+                                           "<api_token> <local file path> "\
+                                           "<reponame>/<file path>")
+    parser.add_argument('owner',
+                        help='owner of repo')
+    parser.add_argument('api_token',
+                        help='authorized API token')
+    parser.add_argument('local_file_path',
+                        help='file to commit')
+    parser.add_argument('repo_file_path',
+                        help='reponame and path where to commit')
+
+    parser.add_argument("--verbose", help="increase output verbosity",
+                        action="store_true")
     args = parser.parse_args()
-    
+
     #open file, read it, encode it
     try:
         with open(args.local_file_path, 'r') as f:
             content = base64.b64encode(f.read())
     except IOError, e:
-        print e
+        print(e)
         exit(1)
     #split arg's repo_file_path to repo_name and repo_file_path
     try:
-        repo_name, repo_file_path = args.repo_file_path.split('/',1)
+        repo_name, repo_file_path = args.repo_file_path.split('/', 1)
     except ValueError, e:
         print(e)
         exit(1)
 
     saver = GitSaver(args.owner, args.api_token, repo_name, repo_file_path, content)
 
+    if args.verbose:
+        print("check if repo exists")
+    #check
     if not saver.repo_exists():
+        if args.verbose:
+            print("no. creating repo")
         saver.create_repo()
+    if args.verbose:
+        print("yes")
+
+    if args.verbose:
+        print("get file info")
 
     file_sha = saver.get_file()
 
-    if file_sha
+
+    if file_sha:
+        if args.verbose:
+            print("file already exists. updating. %s" % file_sha)
+        return saver.update_file(file_sha)
+    else:
+        if args.verbose:
+            print("file is new. creating")
+        return saver.create_file()
 
 
 if __name__ == "__main__":
-    main()
+    commit_sha = main()
+    print(commit_sha)
