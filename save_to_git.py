@@ -30,8 +30,11 @@ class GitSaver(object):
         req = requests.get(url, headers=self.headers)
         if req.status_code == 200:
             return True
-        else:
+        elif req.status_code == 404:
             return False
+        else:
+            # others errors handled elsewhere
+            return req.raise_for_status()
 
     def create_repo(self):
         """
@@ -158,7 +161,13 @@ def main():
     if args.verbose:
         print("check if repo exists")
     #check
-    if not saver.repo_exists():
+    try:
+        exists = saver.repo_exists()
+    except:
+        print("Communication error. e.g check git name and token.")
+        exit(1)
+
+    if not exists:
         if args.verbose:
             print("no. creating repo")
         saver.create_repo()
